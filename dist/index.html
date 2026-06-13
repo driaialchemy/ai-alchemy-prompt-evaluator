@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI Alchemy — Prompt Evaluator</title>
+<style>
+  :root {
+    --purple-deep: #352a59;
+    --purple-mid: #4b3a7a;
+    --gold: #c9a14a;
+    --gold-light: #e8c97a;
+    --bg: #faf8f3;
+    --bg-card: #ffffff;
+    --text: #1a1228;
+    --text-muted: #6b5f7a;
+    --green: #2d9a5f;
+    --amber: #d4820a;
+    --red: #c0392b;
+    --radius: 12px;
+    --shadow: 0 4px 24px rgba(53,42,89,0.10);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Header ── */
+  header {
+    background: linear-gradient(135deg, var(--purple-deep) 0%, var(--purple-mid) 100%);
+    color: #fff;
+    padding: 2rem 1.5rem 1.5rem;
+    text-align: center;
+  }
+  .brand-name {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: clamp(1.8rem, 4vw, 2.8rem);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--gold);
+  }
+  .brand-tagline {
+    font-size: 1rem;
+    color: rgba(255,255,255,0.75);
+    margin-top: 0.35rem;
+    font-style: italic;
+  }
+  .brand-sub {
+    font-size: 0.82rem;
+    color: rgba(255,255,255,0.50);
+    margin-top: 0.2rem;
+  }
+
+  /* ── Main layout ── */
+  main {
+    flex: 1;
+    max-width: 860px;
+    width: 100%;
+    margin: 2rem auto;
+    padding: 0 1.25rem 3rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--bg-card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 1.75rem;
+    border: 1px solid rgba(53,42,89,0.08);
+  }
+  .card-title {
+    font-family: Georgia, serif;
+    font-size: 1.2rem;
+    color: var(--purple-deep);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .card-title::before {
+    content: '';
+    display: inline-block;
+    width: 4px;
+    height: 1.1em;
+    background: var(--gold);
+    border-radius: 2px;
+  }
+
+  /* ── Form ── */
+  label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--purple-deep);
+    margin-bottom: 0.4rem;
+  }
+  textarea, input[type="text"] {
+    width: 100%;
+    border: 1.5px solid rgba(53,42,89,0.22);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    font-family: inherit;
+    font-size: 0.95rem;
+    background: var(--bg);
+    color: var(--text);
+    transition: border-color 0.2s;
+    resize: vertical;
+  }
+  textarea:focus, input[type="text"]:focus {
+    outline: none;
+    border-color: var(--purple-mid);
+    box-shadow: 0 0 0 3px rgba(75,58,122,0.12);
+  }
+  textarea { min-height: 160px; }
+  .char-counter {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    text-align: right;
+    margin-top: 0.3rem;
+    transition: color 0.2s;
+  }
+  .char-counter.warn { color: var(--amber); font-weight: 600; }
+  .char-counter.over { color: var(--red); font-weight: 700; }
+
+  .form-group { margin-bottom: 1.25rem; }
+  .form-group:last-of-type { margin-bottom: 0; }
+
+  .goal-hint {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 0.3rem;
+  }
+
+  /* ── Evaluate button ── */
+  .btn-evaluate {
+    margin-top: 1.25rem;
+    width: 100%;
+    padding: 0.9rem 1.5rem;
+    background: linear-gradient(135deg, var(--gold) 0%, #b8893a 100%);
+    color: var(--purple-deep);
+    font-family: Georgia, serif;
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+    box-shadow: 0 2px 10px rgba(201,161,74,0.35);
+  }
+  .btn-evaluate:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(201,161,74,0.45);
+  }
+  .btn-evaluate:active:not(:disabled) { transform: translateY(0); }
+  .btn-evaluate:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  /* ── Loading ── */
+  #loading {
+    display: none;
+    text-align: center;
+    padding: 2.5rem 1rem;
+  }
+  .spinner {
+    width: 48px; height: 48px;
+    border: 4px solid rgba(53,42,89,0.15);
+    border-top-color: var(--purple-mid);
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+    margin: 0 auto 1rem;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #loading p { color: var(--text-muted); font-style: italic; }
+
+  /* ── Error ── */
+  #error-box {
+    display: none;
+    background: #fff5f5;
+    border: 1.5px solid #f5c6c6;
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    color: var(--red);
+    font-size: 0.92rem;
+    margin-top: 1rem;
+  }
+
+  /* ── Results ── */
+  #results { display: none; }
+
+  /* Score ring */
+  .score-section {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    flex-wrap: wrap;
+  }
+  .score-ring-wrap { flex-shrink: 0; }
+  .score-ring-svg { width: 110px; height: 110px; }
+  .score-ring-text {
+    font-family: Georgia, serif;
+    font-size: 2rem;
+    font-weight: 700;
+    fill: var(--purple-deep);
+  }
+  .score-ring-label {
+    font-size: 0.7rem;
+    fill: var(--text-muted);
+    font-family: 'Segoe UI', sans-serif;
+  }
+  .score-info { flex: 1; min-width: 200px; }
+  .verdict-text {
+    font-size: 1.05rem;
+    color: var(--text);
+    line-height: 1.5;
+    font-style: italic;
+  }
+  .overall-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 0.4rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  /* Criteria bars */
+  .criteria-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+  .criterion {
+    display: grid;
+    grid-template-columns: 130px 1fr 36px;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .criterion-name {
+    font-size: 0.83rem;
+    font-weight: 600;
+    color: var(--purple-deep);
+    text-transform: capitalize;
+    white-space: nowrap;
+  }
+  .criterion-name.long { font-size: 0.76rem; }
+  .bar-track {
+    height: 10px;
+    background: rgba(53,42,89,0.08);
+    border-radius: 5px;
+    overflow: hidden;
+    position: relative;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 5px;
+    transition: width 0.8s cubic-bezier(0.4,0,0.2,1);
+    width: 0;
+  }
+  .criterion-score {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--purple-deep);
+    text-align: right;
+  }
+  .criterion-note {
+    grid-column: 2 / 4;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-top: -0.4rem;
+    line-height: 1.4;
+  }
+
+  /* Improved prompt */
+  .improved-box {
+    background: linear-gradient(135deg, rgba(53,42,89,0.04) 0%, rgba(201,161,74,0.07) 100%);
+    border: 1.5px solid rgba(201,161,74,0.35);
+    border-radius: 10px;
+    padding: 1.25rem;
+    white-space: pre-wrap;
+    font-size: 0.92rem;
+    line-height: 1.65;
+    color: var(--text);
+    max-height: 340px;
+    overflow-y: auto;
+  }
+  .improved-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .btn-copy {
+    padding: 0.4rem 1rem;
+    background: var(--purple-deep);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+  }
+  .btn-copy:hover { background: var(--purple-mid); }
+  .btn-copy:active { transform: scale(0.96); }
+  .btn-copy.copied { background: var(--green); }
+
+  /* History */
+  .history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 320px;
+    overflow-y: auto;
+  }
+  .history-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.65rem 0.9rem;
+    border: 1.5px solid rgba(53,42,89,0.10);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    background: var(--bg);
+  }
+  .history-item:hover { background: rgba(53,42,89,0.05); border-color: var(--purple-mid); }
+  .history-badge {
+    font-size: 0.82rem;
+    font-weight: 700;
+    min-width: 32px;
+    text-align: center;
+    padding: 0.2rem 0.4rem;
+    border-radius: 5px;
+    color: #fff;
+  }
+  .history-snippet {
+    flex: 1;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .history-date {
+    font-size: 0.72rem;
+    color: rgba(107,95,122,0.6);
+    white-space: nowrap;
+  }
+  .history-empty {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    text-align: center;
+    padding: 1rem 0;
+    font-style: italic;
+  }
+  .history-clear {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-decoration: underline;
+    margin-top: 0.5rem;
+    padding: 0;
+  }
+  .history-clear:hover { color: var(--red); }
+
+  /* Footer */
+  footer {
+    background: var(--purple-deep);
+    color: rgba(255,255,255,0.55);
+    text-align: center;
+    padding: 1rem;
+    font-size: 0.82rem;
+  }
+  footer a { color: var(--gold); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+
+  @media (max-width: 520px) {
+    .criterion {
+      grid-template-columns: 110px 1fr 30px;
+      gap: 0.5rem;
+    }
+    .score-section { gap: 1.25rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand-name">⚗️ AI Alchemy</div>
+  <div class="brand-tagline">Transmute rough prompts into gold</div>
+  <div class="brand-sub">Prompt Engineering Evaluator · Scottsdale, AZ</div>
+</header>
+
+<main>
+
+  <!-- Input card -->
+  <div class="card">
+    <div class="card-title">Evaluate Your Prompt</div>
+    <div class="form-group">
+      <label for="prompt-input">Your Prompt</label>
+      <textarea id="prompt-input" placeholder="Paste the prompt you want to evaluate here…" maxlength="8000"></textarea>
+      <div class="char-counter" id="char-counter">0 / 8000</div>
+    </div>
+    <div class="form-group">
+      <label for="goal-input">Goal <span style="font-weight:400;color:var(--text-muted)">(optional)</span></label>
+      <input type="text" id="goal-input" placeholder="e.g. Generate a product description for an e-commerce listing" />
+      <div class="goal-hint">Describe what you want this prompt to accomplish — helps the evaluator give targeted feedback.</div>
+    </div>
+    <button class="btn-evaluate" id="evaluate-btn" onclick="runEvaluation()">✦ Evaluate Prompt</button>
+    <div id="error-box"></div>
+  </div>
+
+  <!-- Loading -->
+  <div id="loading" class="card">
+    <div class="spinner"></div>
+    <p>Transmuting your prompt… this takes a moment ✦</p>
+  </div>
+
+  <!-- Results -->
+  <div id="results">
+
+    <!-- Overall score -->
+    <div class="card">
+      <div class="card-title">Overall Score</div>
+      <div class="score-section">
+        <div class="score-ring-wrap">
+          <svg class="score-ring-svg" viewBox="0 0 110 110">
+            <circle cx="55" cy="55" r="46" fill="none" stroke="rgba(53,42,89,0.10)" stroke-width="10"/>
+            <circle id="ring-arc" cx="55" cy="55" r="46" fill="none" stroke="#2d9a5f" stroke-width="10"
+              stroke-dasharray="289 289" stroke-dashoffset="289"
+              stroke-linecap="round" transform="rotate(-90 55 55)"
+              style="transition: stroke-dashoffset 1s ease, stroke 0.5s"/>
+            <text id="ring-score" x="55" y="60" text-anchor="middle" class="score-ring-text">—</text>
+            <text x="55" y="76" text-anchor="middle" class="score-ring-label">out of 10</text>
+          </svg>
+        </div>
+        <div class="score-info">
+          <div class="overall-label">Verdict</div>
+          <div class="verdict-text" id="verdict-text">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Criteria breakdown -->
+    <div class="card">
+      <div class="card-title">Criteria Breakdown</div>
+      <div class="criteria-grid" id="criteria-grid"></div>
+    </div>
+
+    <!-- Improved prompt -->
+    <div class="card">
+      <div class="card-title">Improved Prompt</div>
+      <div class="improved-header">
+        <span style="font-size:0.85rem;color:var(--text-muted)">AI Alchemy rewrite ↓</span>
+        <button class="btn-copy" id="copy-btn" onclick="copyImproved()">Copy</button>
+      </div>
+      <div class="improved-box" id="improved-prompt"></div>
+    </div>
+
+  </div>
+
+  <!-- History -->
+  <div class="card">
+    <div class="card-title">History <span style="font-weight:400;font-size:0.82rem;color:var(--text-muted)">(last 20)</span></div>
+    <div class="history-list" id="history-list"></div>
+    <button class="history-clear" onclick="clearHistory()">Clear history</button>
+  </div>
+
+</main>
+
+<footer>
+  Powered by <a href="https://aialchemydr.com" target="_blank">AI Alchemy</a> · aialchemydr.com · Scottsdale, AZ
+</footer>
+
+<script>
+const HISTORY_KEY = 'aialchemy_eval_history';
+const MAX_HISTORY = 20;
+
+// ── Character counter ──
+const promptInput = document.getElementById('prompt-input');
+const charCounter = document.getElementById('char-counter');
+
+promptInput.addEventListener('input', () => {
+  const len = promptInput.value.length;
+  charCounter.textContent = `${len.toLocaleString()} / 8,000`;
+  charCounter.className = 'char-counter' + (len > 7500 ? (len >= 8000 ? ' over' : ' warn') : '');
+});
+
+// ── Evaluation ──
+async function runEvaluation() {
+  const prompt = promptInput.value.trim();
+  const goal = document.getElementById('goal-input').value.trim();
+
+  if (!prompt) { showError('Please enter a prompt to evaluate.'); return; }
+  if (prompt.length > 8000) { showError('Prompt exceeds 8,000 characters. Please shorten it.'); return; }
+
+  hideError();
+  showLoading(true);
+  document.getElementById('results').style.display = 'none';
+  document.getElementById('evaluate-btn').disabled = true;
+
+  try {
+    const res = await fetch('/evaluate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, goal }),
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      showError(data.error || `Server error ${res.status}`);
+      return;
+    }
+    renderResults(data);
+    saveHistory({ prompt, goal, result: data, ts: Date.now() });
+  } catch (err) {
+    showError('Network error — please try again. (' + err.message + ')');
+  } finally {
+    showLoading(false);
+    document.getElementById('evaluate-btn').disabled = false;
+  }
+}
+
+function renderResults(data) {
+  // Score ring
+  const score = Math.min(10, Math.max(0, Number(data.overall) || 0));
+  const circumference = 2 * Math.PI * 46; // 289
+  const offset = circumference * (1 - score / 10);
+  const arc = document.getElementById('ring-arc');
+  const ringText = document.getElementById('ring-score');
+  const color = score >= 8 ? '#2d9a5f' : score >= 5 ? '#d4820a' : '#c0392b';
+
+  arc.style.stroke = color;
+  // Trigger reflow then animate
+  arc.style.strokeDashoffset = circumference;
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => { arc.style.strokeDashoffset = offset; });
+  });
+  ringText.textContent = score.toFixed(1);
+  ringText.style.fill = color;
+
+  // Verdict
+  document.getElementById('verdict-text').textContent = data.verdict || '';
+
+  // Criteria
+  const criteriaOrder = ['clarity','specificity','context','structure','output_format','constraints','examples'];
+  const criteriaLabels = {
+    clarity: 'Clarity',
+    specificity: 'Specificity',
+    context: 'Context',
+    structure: 'Structure',
+    output_format: 'Output Format',
+    constraints: 'Constraints',
+    examples: 'Examples',
+  };
+  const grid = document.getElementById('criteria-grid');
+  grid.innerHTML = '';
+
+  criteriaOrder.forEach(key => {
+    const crit = data.criteria?.[key];
+    if (!crit) return;
+    const s = Math.min(10, Math.max(0, Number(crit.score) || 0));
+    const barColor = s >= 8 ? '#2d9a5f' : s >= 5 ? '#d4820a' : '#c0392b';
+    const isLong = key === 'output_format';
+
+    const row = document.createElement('div');
+    row.className = 'criterion';
+    row.innerHTML = `
+      <div class="criterion-name${isLong ? ' long' : ''}">${criteriaLabels[key]}</div>
+      <div class="bar-track"><div class="bar-fill" style="background:${barColor}" data-pct="${s * 10}"></div></div>
+      <div class="criterion-score" style="color:${barColor}">${s}</div>
+      <div class="criterion-note">${escHtml(crit.note || '')}</div>
+    `;
+    grid.appendChild(row);
+  });
+
+  // Animate bars
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      grid.querySelectorAll('.bar-fill').forEach(el => {
+        el.style.width = el.dataset.pct + '%';
+      });
+    });
+  });
+
+  // Improved prompt
+  document.getElementById('improved-prompt').textContent = data.improved_prompt || '';
+  document.getElementById('copy-btn').textContent = 'Copy';
+  document.getElementById('copy-btn').className = 'btn-copy';
+
+  document.getElementById('results').style.display = 'block';
+  document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ── Copy button ──
+function copyImproved() {
+  const text = document.getElementById('improved-prompt').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = 'Copied!';
+    btn.className = 'btn-copy copied';
+    setTimeout(() => { btn.textContent = 'Copy'; btn.className = 'btn-copy'; }, 2000);
+  }).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  });
+}
+
+// ── History ──
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; }
+  catch { return []; }
+}
+
+function saveHistory(entry) {
+  let hist = loadHistory();
+  hist.unshift(entry);
+  if (hist.length > MAX_HISTORY) hist = hist.slice(0, MAX_HISTORY);
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(hist));
+  renderHistory();
+}
+
+function renderHistory() {
+  const list = document.getElementById('history-list');
+  const hist = loadHistory();
+  if (!hist.length) {
+    list.innerHTML = '<div class="history-empty">No evaluations yet — your history will appear here.</div>';
+    return;
+  }
+  list.innerHTML = '';
+  hist.forEach((entry, i) => {
+    const score = entry.result?.overall ?? '?';
+    const color = score >= 8 ? '#2d9a5f' : score >= 5 ? '#d4820a' : '#c0392b';
+    const snippet = (entry.prompt || '').slice(0, 80).replace(/\n/g, ' ');
+    const date = new Date(entry.ts).toLocaleDateString(undefined, { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+    const item = document.createElement('div');
+    item.className = 'history-item';
+    item.innerHTML = `
+      <span class="history-badge" style="background:${color}">${Number(score).toFixed(0)}</span>
+      <span class="history-snippet">${escHtml(snippet)}…</span>
+      <span class="history-date">${date}</span>
+    `;
+    item.addEventListener('click', () => {
+      promptInput.value = entry.prompt || '';
+      document.getElementById('goal-input').value = entry.goal || '';
+      promptInput.dispatchEvent(new Event('input'));
+      renderResults(entry.result);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+    list.appendChild(item);
+  });
+}
+
+function clearHistory() {
+  if (!confirm('Clear all evaluation history?')) return;
+  localStorage.removeItem(HISTORY_KEY);
+  renderHistory();
+}
+
+// ── Utilities ──
+function showLoading(on) {
+  document.getElementById('loading').style.display = on ? 'block' : 'none';
+}
+function showError(msg) {
+  const box = document.getElementById('error-box');
+  box.textContent = '⚠ ' + msg;
+  box.style.display = 'block';
+}
+function hideError() {
+  document.getElementById('error-box').style.display = 'none';
+}
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Allow Ctrl/Cmd+Enter to submit
+promptInput.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') runEvaluation();
+});
+
+// Init
+renderHistory();
+</script>
+</body>
+</html>
