@@ -1,0 +1,17 @@
+# Secrets — never commit
+.streamlit/secrets.toml
+.env
+*.key
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Local editor/agent config
+.claude/
+
+# OS
+Thumbs.db
+.DS_Store

@@ -144,6 +144,85 @@ Then open `http://localhost:3333`. The backend function won't run locally withou
 
 ---
 
+## Local Streamlit App
+
+This repository also includes a local Streamlit version of the AI Alchemy Prompt Evaluator.
+
+The Streamlit app uses:
+
+- `app.py` for the local UI and evaluator workflow
+- `prompt_knowledge_base.md` as the compressed prompt-engineering reference
+- `prompt_reference_manifest.json` as the one-time ingestion record
+- `OPENAI_API_KEY` from the environment or Streamlit secrets
+
+The original reference documents were ingested once into `prompt_knowledge_base.md`. Do not reread the original source documents unless they change or a new ingestion pass is intentionally requested.
+
+### Run Streamlit locally
+
+```powershell
+cd "C:\Users\msell\OneDrive\AIAlchemy\promptevaluator"
+pip install -r requirements.txt
+$env:OPENAI_API_KEY="your_key_here"
+streamlit run app.py
+```
+
+Alternatively, create `.streamlit/secrets.toml` locally:
+
+```toml
+OPENAI_API_KEY = "your_key_here"
+```
+
+The Streamlit app accepts:
+
+- Prompt
+- Optional goal
+- Optional audience
+- Optional task type
+- Optional context
+- Optional constraints
+- Optional output format
+- Optional verification, reflection, or fact-checking instructions
+
+It returns:
+
+- Overall score
+- Scores for clarity, specificity, context, structure, output format, constraints, and examples
+- Coaching diagnosis
+- Clean Rewrite, Structured Prompt, and Advanced Prompt versions
+- A best recommendation explaining which version to use
+
+### Model & API call
+
+- **Model:** `gpt-4.1-mini` (override with `OPENAI_MODEL` env var)
+- Uses the OpenAI **Responses API** (`client.responses.create`)
+- Output is forced to valid JSON via `text={"format": {"type": "json_object"}}`. The input string contains the word "json" because the Responses API requires it when using `json_object` format.
+
+### Recommendation logic
+
+The system prompt instructs the model to **choose the simplest option that fixes the prompt's weaknesses**, and to default to **Clean Rewrite** when in doubt:
+
+- **Clean Rewrite** — already-clear prompts that just need tightening (most conversational/creative/simple prompts)
+- **Structured Prompt** — genuinely complex, multi-step tasks that benefit from explicit role/scaffold/format
+- **Advanced Prompt** — fact-checking, multi-source research, agent workflows, or high-stakes verification
+
+This replaced the earlier behavior where the model nearly always defaulted to Structured Prompt.
+
+### JSON parsing robustness
+
+`extract_json()` parses the model response with `json.loads()`. If that fails, it applies two repairs as a fallback before re-parsing:
+
+1. `_repair_json_strings()` — escapes literal newlines/tabs that appear inside string values (string-aware; does not touch structure between fields)
+2. `_strip_trailing_commas()` — removes trailing commas before `}` or `]`
+
+With `json_object` format now enforced at the API level, these repairs are rarely needed but remain as a safety net. On total failure the error message includes a 400-char window around the parse error for debugging.
+
+### Notes
+
+- The "Evaluate prompt" button is always active; empty-prompt validation happens on click (shows a warning rather than disabling the button).
+- The Streamlit app uses `OPENAI_API_KEY` (OpenAI), distinct from the Cloudflare Pages app which uses `ANTHROPIC_API_KEY` (Anthropic). They are two separate evaluator implementations in this repo.
+
+---
+
 ## Deploying Changes
 
 ```powershell
